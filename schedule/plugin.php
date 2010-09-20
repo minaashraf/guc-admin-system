@@ -448,6 +448,8 @@ $num = 0;
 				while(true)
 				{
 					fwrite($fh,"BEGIN:VEVENT\r\n");
+					if($startMonth==9)
+						$startMonth = '09';
 					$dstart = 'DTSTART:2010'.$startMonth.$startDay.$startTime;
 					$dend = 'DTEND:2010'.$startMonth.$startDay.$endTime;
 					$des ='DESCRIPTION:'.str_ireplace("\r\n",' ',str_ireplace("\t",'',trim($data[$j][2])));
