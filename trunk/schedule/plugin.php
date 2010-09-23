@@ -13,6 +13,7 @@ register_activation_hook(__FILE__,'install_guc_schedule');
 
 add_filter('the_content', 'guc_work');
 add_action('init', 'generate_schedule');
+add_action('init', 'unlock_transcript');
 add_action('admin_menu', 'guc_menu');
 
 wp_register_script('guc-colorpicker', WP_PLUGIN_URL.'/gucTables/js/colorpicker.js');
@@ -63,7 +64,7 @@ function guc_work($content){
 	</div>
 	<div style="float: left; margin-top: 10px; margin-left: 10px;">
 		<b>Font color: </b>
-		<select style="width:150px"name="lectures_font">
+		<select style="width:150px" name="lectures_font">
 			<option value="white">White</option>
  			<option value="yellow">Yellow</option>
   			<option value="black" selected>Black</option>
@@ -77,10 +78,10 @@ function guc_work($content){
 	<div style="float: left;padding-right:10px;border-right:1px solid #666">
 		<label for="input_tutorials"><b>Tutorials color</b></label><br>
 		<div style="display:inline-block"id="tutorials_color"></div>
-		<input id=""input_tutorials" name="lecture" type="hidden" value="">
+		<input id="input_tutorials" name="tutorial" type="hidden" value="">
 	</div>
 	<div style="float: left; margin-top: 10px; margin-left: 10px;"><b>Font color: </b>
-		<select style="width:150px"name="tutorials_font">
+		<select style="width:150px" name="tutorials_font">
 			<option value="white">White</option>
  			<option value="yellow">Yellow</option>
   			<option value="black" selected>Black</option>
@@ -96,7 +97,7 @@ function guc_work($content){
 		<div style="float: left;padding-right:10px;border-right:1px solid #666">
 		<label for="input_labs"><b>Labs color</b></label><br>
 		<div style="display:inline-block"id="labs_color"></div>
-		<input id="input_labs" name="lecture" type="hidden" value="">
+		<input id="input_labs" name="lab" type="hidden" value="">
 	</div>
 	<div style="float: left; margin-top: 10px; margin-left: 10px;"><b>Font color: </b>
 		<select style="width:150px"name="labs_font">
@@ -211,8 +212,22 @@ HTML;
 	return $toBe;
 	}
 	else{
-		return $content;
+		$check = explode('[guc-transcript]', $content);
+		if(count($check) != 1){
+			$form = <<<HTML
+				<form action="" method="POST">
+				<b>Username</b><br>
+				<input type="text" name="username"><br>
+				<b>Password</b><br>
+				<input type="password" name="password"><br><br>
+				<input type="submit" value="Unlock Transcript">
+				<input type="hidden" name="unlock_transcript_galal">
+				</form>		
+HTML;
+		return str_ireplace('[guc-transcript]', $form, $content);
+		}
 	}
+	return $content;
 }
 
 function generate_schedule(){
@@ -228,9 +243,10 @@ $num = 0;
 			curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_NTLM); 
 			curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8) Gecko/20051111 Firefox/1.5 BAVM/1.0.0');
 			curl_setopt($ch, CURLOPT_USERPWD, "$username:$pass");
-
+			
 			$contents = curl_exec($ch);
 			curl_close($ch);
+			$generated = "<table style='font-family:Tahoma; padding:5px; border-collapse:collapse; font-size:14pt; width:auto; border-style:solid; border-color:black; border-width:1px;' align='center' id='student_schedule' border='1'><tr>\n\t<td>Day</td>\n\t<td align='center'>First Slot</td>\n\t<td align='center'>Second Slot</td><td align='center'>Third Slot</td><td align='center'>Fourth Slot</td><td align='center'>Fifth Slot</td></tr>\n";
 			if(!(strpos($contents, '##############################################################################') && strpos($contents, 'GUC Administration System') && strpos($contents, 'Alfred Raouf')))
 			{
 				wp_die("There's an error fetching the schedule. The Admin system might be down or your username/password is/are incorrect.");
@@ -241,7 +257,13 @@ $num = 0;
 				$html = str_get_html($contents);
 				$days = array('Xrw1', 'Xrw2', 'Xrw3', 'Xrw4', 'Xrw5', 'Xrw6');
 				$dayOffs = array('XaltR1','XaltR2','XaltR3','XaltR4','XaltR5','XaltR6');
+				$week = array('Saturday','Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday');
 				$lecture_id = 1;
+				$tut_id = 1;
+				$lab_id = 1;
+				$day_counter = 0;
+				$courses = array();
+				$totalNumSlots = 0;
 				foreach($days as $dayId){
 					$day = $html->find("tr[id=$dayId]");
 					if($day!= null){
@@ -251,7 +273,14 @@ $num = 0;
 					else
 						$inners = array();			
 					$slot = 1;
+					$i = 0;
+					if($i != 0)
+							$generated .= "</tr>";
+					$generated .= "<tr id='day_$day_counter'>";
+					$generated .= "<td>$week[$day_counter]</td>";
+					$day_counter++;
 					foreach($inners as $tr){
+						$i = 1;
 						$tables = $tr->children();
 						//tables elly gowa el main td
 						foreach($tables as $table){
@@ -260,10 +289,10 @@ $num = 0;
 							$table->border = '0';
 							if(strpos($table->innertext, 'Lab') != false){
 								if(!(isset($_POST['lab'])) || strlen(trim($_POST['lab'])) == 0)
-									$color = 'yellow';
+									$tdcolor = 'yellow';
 								else
-									$color = $_POST['lab'];
-								$table->parent()->bgcolor = $color;
+									$tdcolor = $_POST['lab'];
+								//$table->parent()->bgcolor = $color;
 								$bold = isset($_POST['labs_font_bold']);
 								if($bold){
 									$bold = '<strong>';
@@ -271,23 +300,30 @@ $num = 0;
 								}
 								$check = array('white', 'yellow', 'black');
 								if(isset($_POST['labs_font']) && in_array($_POST['labs_font'], $check))
-									$color = $_POST['labs_font'];
+									$fontcolor = $_POST['labs_font'];
 								else
-									$color = 'black';
+									$fontcolor = 'black';
 								$tds = $table->find('td');
 								foreach($tds as $td){
 									//Remove the Tutorial Group
 									if($td->width == '20'){
-										$td->style = 'display:none';
+										//$td->style = 'display:none';
 									}
 									else if($td->width == '40'){
 										//Get the place
 										$location = $td->plaintext;
-										$td->style = 'display:none';
+										//$td->style = 'display:none';
 									}
 									else{
 										$description = $td->plaintext;
-										$td->innertext = "<font color='$color' size='2' face='Tahoma'>$bold" . $td->plaintext . ' @ ' . $location. "$boldEnd</font>";
+										$course = explode(' ', $description);
+										$course = trim($course[0] . preg_replace("/[^0-9]/", '', $course[1]));
+										if(!isset($courses[$course]))
+											$courses[$course] = 1;
+										else
+											$courses[$course]++;
+										$generated .= "<td id='lab_$lab_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $td->plaintext @ $location $boldEnd</center></font></td>";
+										$lab_id++;
 									}
 								}
 								$data[$num][0]=$DAY;
@@ -305,21 +341,29 @@ $num = 0;
 								}
 								$check = array('white', 'yellow', 'black');
 								if(isset($_POST['lectures_font']) && in_array($_POST['lectures_font'], $check))
-									$color = $_POST['lectures_font'];
+									$fontcolor = $_POST['lectures_font'];
 								else
-									$color = 'black';
+									$fontcolor = 'black';
 								$lec = $table->plaintext;
 								$lecLocation = explode(')', $lec);
 								$lecLocation = $lecLocation[1];
 								$lecTitle = explode('(', $lec);
 								$lecTitle = $lecTitle[0];
+								$course = explode(' ', $lecTitle);
+								$course = trim($course[0] . $course[1]);
+								if(!isset($courses[$course]))
+									$courses[$course] = 1;
+								else
+									$courses[$course]++;
 								$location = $lecLocation;
 								$description = $lecTitle;
-								$table->innertext = "<font id='$lecture_id' color='$color' size='2' face='Tahoma'><center>$bold" . $lecTitle . " @ $lecLocation $boldEnd</center></font>";
 								if(!(isset($_POST['lecture'])) || strlen(trim($_POST['lecture'])) == 0)
-									$color = 'red';
+									$tdcolor = 'red';
 								else
-									$color = $_POST['lecture'];
+									$tdcolor = $_POST['lecture'];
+								$table->innertext = "<font id='$lecture_id' color='$color' size='2' face='Tahoma'><center>$bold" . $lecTitle . " @ $lecLocation $boldEnd</center></font>";		
+								$generated .= "<td id='lecture_$lecture_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $table->plaintext $boldEnd</center></font></td>";
+										$lecture_id++;
 								$table->parent()->bgcolor = $color;
 								$data[$num][0]=$DAY;
 								$data[$num][1]=$slot;
@@ -330,11 +374,11 @@ $num = 0;
 							}
 							else if(strpos($table->innertext, 'Tut') != false){
 								if(!(isset($_POST['tutorial'])) || strlen(trim($_POST['tutorial'])) == 0)
-									$color = 'blue';
+									$tdcolor = 'blue';
 								else
-									$color = $_POST['tutorial'];
-								$table->parent()->bgcolor = $color;
-								$table->parent()->height = '20%';
+									$tdcolor = $_POST['tutorial'];
+//								$table->parent()->bgcolor = $color;
+//								$table->parent()->height = '20%';
 								$bold = isset($_POST['tutorials_font_bold']);
 								if($bold){
 									$bold = '<strong>';
@@ -342,9 +386,9 @@ $num = 0;
 								}
 								$check = array('white', 'yellow', 'black');
 								if(isset($_POST['tutorials_font']) && in_array($_POST['tutorials_font'], $check))
-									$color = $_POST['tutorials_font'];
+									$fontcolor = $_POST['tutorials_font'];
 								else
-									$color = 'black';
+									$fontcolor = 'black';
 								$tds = $table->find('td');
 								foreach($tds as $td){
 									//Remove the Tutorial Group
@@ -358,7 +402,15 @@ $num = 0;
 									}
 									else{
 										$description = $td->plaintext;
-										$td->innertext = "<font color='$color' size='2' face='Tahoma'>$bold" . $td->plaintext . ' @ ' . $location. "$boldEnd</font>";
+										$course = explode(' ', $description);
+										$course = trim($course[0] . preg_replace("/[^0-9]/", '', $course[1]));
+										if(!isset($courses[$course]))
+											$courses[$course] = 1;
+										else
+											$courses[$course]++;
+										//$td->innertext = "<font color='$color' size='2' face='Tahoma'>$bold" . $td->plaintext . ' @ ' . $location. "$boldEnd</font>";
+										$generated .= "<td id='tutorial_$tutorial_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $td->plaintext $boldEnd</center></font></td>";
+										$tutorial_id++;
 									}	
 								}
 								$data[$num][0]=$DAY;
@@ -372,26 +424,34 @@ $num = 0;
 								if(!(isset($_POST['free'])) || strlen(trim($_POST['free'])) == 0)
 									$bgcolor = 'green';
 								else
-									$color = $_POST['free'];
-								$table->parent()->bgcolor = $color;
-								$table->bgcolor = $color;
-									$slot+=1;
+									$bgcolor = $_POST['free'];
+//								$table->parent()->bgcolor = $color;
+//								$table->bgcolor = $color;
+								$slot+=1;
+								$totalNumSlots++;
+								$generated .= "<td bgcolor='$bgcolor'><strong><center>FREE</center></strong></td>";
 							}	
 						}
 					}
 				}
+				$generated .= "</table>";
+				$generatedHtml = str_get_html($generated);
+				$counter = 0;
 				foreach($dayOffs as $dayOff){
-					$day = $html->find("tr[id=$dayOff]");
-					if($day!= null)
-						$inners = $day[0]->children();
-					else
-						$inners = array();
-					if(!(isset($_POST['dayoff'])) || strlen(trim($_POST['dayoff'])) == 0)
-						$bgcolor = 'green';
+					//echo "DAMN!";
+					$test = $html->find("tr[id=$dayOff]",0);
+					//echo $test->id;
+					if(isset($_POST['dayoff']) || strlen(trim($_POST['dayoff'])) == 0)
+						$color = 'darkgreen';
 					else
 						$color = $_POST['dayoff'];
-					foreach($inners as $free){
-						$free->bgcolor = $color;
+					if($test != null){
+						$tr = $generatedHtml->find("tr[id=day_$counter]", 0);
+						$td = $tr->first_child();
+						$td->outertext = $td->outertext . "<td align='center' colspan='5' bgcolor='$color'><strong>DAY OFF</strong></td>";
+						$td->parent()->bgcolor = $color;
+					}
+					$counter++;
 					}
 				}
 			$csvCheck = isset($_POST['csv']);
@@ -596,11 +656,72 @@ $num = 0;
 //				$pdf->render();
 //				$pdf->stream("$file_name.pdf");
 				echo "<center><h3><font face='Tahoma'>[$studentID] $studentName Schedule</font></h3></center>";
-				echo str_ireplace('Period', 'Slot', $html);
+				echo $generatedHtml;
+				echo '<center>';
+				echo "<ul>";
+				echo "<h3>A total of " . count($courses) . " course(s) as:</h3>";
+				$free = $totalNumSlots;
+				$totalNumSlots = 0;
+				foreach($courses as $course=>$numSlots){
+					echo "<li>$course has $numSlots slot(s)</li>";
+					$totalNumSlots += $numSlots;
+				}
+				echo "</ul>";
+				echo "<h4>a total of $totalNumSlots busy slots and $free free slots.</h4>";
+				echo '<small>Powered by Schedule Beautifier</small>';
+				echo '</center>';
 				die();
 			}//end of our if condition
-	}
 }
+
+function unlock_transcript(){
+	if(isset($_POST['unlock_transcript_galal']) && isset($_POST['username']) && isset($_POST['password']) || isset($_POST['stdYrLst'])){
+			$ch = curl_init();
+			$fields_string = '';
+			if((isset($_POST['stdYrLst']))){
+				//$fields_string = '';
+				//foreach($_POST as $key=>$value) { if(!($key == 'username' || $key == 'password'))$fields_string .= $key.'='.$value.'&'; }
+				//trim($fields_string,'&');
+				//echo $fields_string;
+				foreach($_POST as $key=>$value) { if(!($key == 'username' || $key == 'password'))$fields_string .= $key.'='.$value.'&'; }
+				echo $fields_string;
+			}
+			$username = $_POST['username'];
+			$pass = $_POST['password']; 
+			curl_setopt($ch, CURLOPT_URL, 'http://student.guc.edu.eg/external/student/grade/Transcript.aspx'); 
+			/* make cURL wait for the proper command */
+			curl_setopt ( $ch, CURLOPT_HTTPHEADER, array ( 'Expect:100-continue' ) );
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); 
+			curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_NTLM); 
+			curl_setopt($ch,CURLOPT_POST,true);
+			curl_setopt($ch,CURLOPT_POSTFIELDS,$fields_string);
+			curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8) Gecko/20051111 Firefox/1.5 BAVM/1.0.0');
+			curl_setopt($ch, CURLOPT_USERPWD, "$username:$pass");
+			//curl_setopt($ch,CURLOPT_FAILONERROR,true);
+			$contents = curl_exec($ch);
+			//echo curl_error($ch);
+			curl_close($ch);
+			if(!(isset($_POST['stdYrLst']))){
+				if(!(strpos($contents, 'stdYrLst'))){
+					wp_die('There was an error unlocking the transcript. The admin system might be down or your username/password is/are incorrect');
+				}
+				require_once(WP_PLUGIN_DIR.'/gucTables/simple_html_dom.php');
+				$html = str_get_html($contents);
+				$form = $html->find('form[id=Form1]', 0);
+				$form->action = $_SERVER['REQUEST_URI'];
+				$form->innertext = $form->innertext .= "<input type='hidden' value='$username' name='username'><input type='hidden' value='$pass' name='password'>";
+				$drpdown = $html->find('select[id=stdYrLst]', 0);
+				$drpdown->disabled = null;
+				echo $html;
+				die();
+			}
+			echo $contents;
+			die();
+	}
+	//die();
+}
+
+
 
 function guc_options(){
 	?>
