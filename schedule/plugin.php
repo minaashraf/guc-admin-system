@@ -246,7 +246,7 @@ $num = 0;
 			
 			$contents = curl_exec($ch);
 			curl_close($ch);
-			$generated = "<table style='font-family:Tahoma; padding:5px; border-collapse:collapse; font-size:14pt; width:auto; border-style:solid; border-color:black; border-width:1px;' align='center' id='student_schedule' border='1'><tr>\n\t<td>Day</td>\n\t<td align='center'>First Slot</td>\n\t<td align='center'>Second Slot</td><td align='center'>Third Slot</td><td align='center'>Fourth Slot</td><td align='center'>Fifth Slot</td></tr>\n";
+			$generated = "<table style='font-family:Tahoma; padding:5px; border-collapse:collapse; font-size:14pt; width:auto; border-style:solid; border-color:black; border-width:1px;' align='center' id='student_schedule' border='1'><tr>\n\t<td width='15%'>Day</td>\n\t<td width='15%' align='center'>First Slot</td>\n\t<td width='15%' align='center'>Second Slot</td><td width='15%' align='center'>Third Slot</td><td width='15%' align='center'>Fourth Slot</td><td width='15%' align='center'>Fifth Slot</td></tr>\n";
 			if(!(strpos($contents, '##############################################################################') && strpos($contents, 'GUC Administration System') && strpos($contents, 'Alfred Raouf')))
 			{
 				wp_die("There's an error fetching the schedule. The Admin system might be down or your username/password is/are incorrect.");
@@ -322,7 +322,7 @@ $num = 0;
 											$courses[$course] = 1;
 										else
 											$courses[$course]++;
-										$generated .= "<td id='lab_$lab_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $td->plaintext @ $location $boldEnd</center></font></td>";
+										$generated .= "<td width='15%' id='lab_$lab_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $td->plaintext @ $location $boldEnd</center></font></td>";
 										$lab_id++;
 									}
 								}
@@ -362,7 +362,7 @@ $num = 0;
 								else
 									$tdcolor = $_POST['lecture'];
 								$table->innertext = "<font id='$lecture_id' color='$color' size='2' face='Tahoma'><center>$bold" . $lecTitle . " @ $lecLocation $boldEnd</center></font>";		
-								$generated .= "<td id='lecture_$lecture_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $table->plaintext $boldEnd</center></font></td>";
+								$generated .= "<td width='15%' id='lecture_$lecture_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $table->plaintext $boldEnd</center></font></td>";
 										$lecture_id++;
 								$table->parent()->bgcolor = $color;
 								$data[$num][0]=$DAY;
@@ -409,7 +409,7 @@ $num = 0;
 										else
 											$courses[$course]++;
 										//$td->innertext = "<font color='$color' size='2' face='Tahoma'>$bold" . $td->plaintext . ' @ ' . $location. "$boldEnd</font>";
-										$generated .= "<td id='tutorial_$tutorial_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $td->plaintext $boldEnd</center></font></td>";
+										$generated .= "<td width='15%' id='tutorial_$tutorial_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $td->plaintext $boldEnd</center></font></td>";
 										$tutorial_id++;
 									}	
 								}
@@ -429,7 +429,7 @@ $num = 0;
 //								$table->bgcolor = $color;
 								$slot+=1;
 								$totalNumSlots++;
-								$generated .= "<td bgcolor='$bgcolor'><strong><center>FREE</center></strong></td>";
+								$generated .= "<td width='15%' bgcolor='$bgcolor'><strong><center>FREE</center></strong></td>";
 							}	
 						}
 					}
@@ -441,7 +441,7 @@ $num = 0;
 					//echo "DAMN!";
 					$test = $html->find("tr[id=$dayOff]",0);
 					//echo $test->id;
-					if(isset($_POST['dayoff']) || strlen(trim($_POST['dayoff'])) == 0)
+					if(!(isset($_POST['dayoff']) || strlen(trim($_POST['dayoff'])) == 0))
 						$color = 'darkgreen';
 					else
 						$color = $_POST['dayoff'];
