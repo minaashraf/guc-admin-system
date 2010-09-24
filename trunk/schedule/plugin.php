@@ -409,7 +409,7 @@ $num = 0;
 										else
 											$courses[$course]++;
 										//$td->innertext = "<font color='$color' size='2' face='Tahoma'>$bold" . $td->plaintext . ' @ ' . $location. "$boldEnd</font>";
-										$generated .= "<td width='15%' id='tutorial_$tutorial_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $td->plaintext $boldEnd</center></font></td>";
+										$generated .= "<td width='15%' id='tutorial_$tutorial_id' bgcolor='$tdcolor'><font size='2' color='$fontcolor'><center>$bold $td->plaintext @ $location $boldEnd</center></font></td>";
 										$tutorial_id++;
 									}	
 								}
@@ -683,7 +683,7 @@ function unlock_transcript(){
 				//foreach($_POST as $key=>$value) { if(!($key == 'username' || $key == 'password'))$fields_string .= $key.'='.$value.'&'; }
 				//trim($fields_string,'&');
 				//echo $fields_string;
-				foreach($_POST as $key=>$value) { if(!($key == 'username' || $key == 'password'))$fields_string .= $key.'='.$value.'&'; }
+				foreach($_POST as $key=>$value) { if(!($key == 'username' || $key == 'password'))$fields_string .= urlencode($key).'='.$value.'&'; }
 				echo $fields_string;
 			}
 			$username = $_POST['username'];
@@ -695,6 +695,7 @@ function unlock_transcript(){
 			curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_NTLM); 
 			curl_setopt($ch,CURLOPT_POST,true);
 			curl_setopt($ch,CURLOPT_POSTFIELDS,$fields_string);
+			curl_setopt($ch, CURLOPT_REFERER, 'http://student.guc.edu.eg/external/student/grade/Transcript.aspx');
 			curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8) Gecko/20051111 Firefox/1.5 BAVM/1.0.0');
 			curl_setopt($ch, CURLOPT_USERPWD, "$username:$pass");
 			//curl_setopt($ch,CURLOPT_FAILONERROR,true);
