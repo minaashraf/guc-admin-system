@@ -311,10 +311,11 @@ $num = 0;
 									}
 									else if($td->width == '40'){
 										//Get the place
-										$location = $td->plaintext;
+										$location = trim($td->plaintext);
 										//$td->style = 'display:none';
 									}
 									else{
+										$td->plaintext = trim($td->plaintext);
 										$description = $td->plaintext;
 										$course = explode(' ', $description);
 										$course = trim($course[0] . preg_replace("/[^0-9]/", '', $course[1]));
@@ -344,18 +345,18 @@ $num = 0;
 									$fontcolor = $_POST['lectures_font'];
 								else
 									$fontcolor = 'black';
-								$lec = $table->plaintext;
+								$lec = trim($table->plaintext);
 								$lecLocation = explode(')', $lec);
 								$lecLocation = $lecLocation[1];
 								$lecTitle = explode('(', $lec);
-								$lecTitle = $lecTitle[0];
+								$lecTitle = trim($lecTitle[0]);
 								$course = explode(' ', $lecTitle);
 								$course = trim($course[0] . $course[1]);
 								if(!isset($courses[$course]))
 									$courses[$course] = 1;
 								else
 									$courses[$course]++;
-								$location = $lecLocation;
+								$location = trim($lecLocation);
 								$description = $lecTitle;
 								if(!(isset($_POST['lecture'])) || strlen(trim($_POST['lecture'])) == 0)
 									$tdcolor = 'red';
@@ -397,10 +398,11 @@ $num = 0;
 									}
 									else if($td->width == '40'){
 										//Get the place
-										$location = $td->plaintext;
+										$location = trim($td->plaintext);
 										$td->style = 'display:none';
 									}
 									else{
+										$td->plaintext = trim($td->plaintext);
 										$description = $td->plaintext;
 										$course = explode(' ', $description);
 										$course = trim($course[0] . preg_replace("/[^0-9]/", '', $course[1]));
@@ -649,12 +651,12 @@ $num = 0;
 				//clean the html
 				$html = $html->find('table[id=scdTbl]');
 				$html = $html[0]->outertext;
-//				require_once(WP_PLUGIN_DIR.'/gucTables/dompdf_config.inc.php');
-//				$pdf = new DOMPDF();
-//				$pdf->load_html(str_ireplace('Period', 'Slot', $html));
-//				$pdf->set_paper('legal', 'landscape');
-//				$pdf->render();
-//				$pdf->stream("$file_name.pdf");
+				require_once(WP_PLUGIN_DIR.'/gucTables/dompdf_config.inc.php');
+				$pdf = new DOMPDF();
+				$pdf->load_html(str_ireplace('Period', 'Slot', $generatedHtml));
+				$pdf->set_paper('legal', 'landscape');
+				$pdf->render();
+				$pdf->stream("$studentID.pdf");
 				echo "<center><h3><font face='Tahoma'>[$studentID] $studentName Schedule</font></h3></center>";
 				echo $generatedHtml;
 				echo '<center>';
@@ -667,7 +669,7 @@ $num = 0;
 					$totalNumSlots += $numSlots;
 				}
 				echo "</ul>";
-				echo "<h4>a total of $totalNumSlots busy slots and $free free slots.</h4>";
+				echo "<h4>a total of $totalNumSlots busy and $free free slots.</h4>";
 				echo '<small>Powered by Schedule Beautifier</small>';
 				echo '</center>';
 				die();
@@ -679,12 +681,7 @@ function unlock_transcript(){
 			$ch = curl_init();
 			$fields_string = '';
 			if((isset($_POST['stdYrLst']))){
-				//$fields_string = '';
-				//foreach($_POST as $key=>$value) { if(!($key == 'username' || $key == 'password'))$fields_string .= $key.'='.$value.'&'; }
-				//trim($fields_string,'&');
-				//echo $fields_string;
-				foreach($_POST as $key=>$value) { if(!($key == 'username' || $key == 'password'))$fields_string .= urlencode($key).'='.$value.'&'; }
-				echo $fields_string;
+				foreach($_POST as $key=>$value) { if(!($key == 'username' || $key == 'password'))$fields_string .= $key .'='.urlencode($value).'&'; }
 			}
 			$username = $_POST['username'];
 			$pass = $_POST['password']; 
@@ -694,7 +691,7 @@ function unlock_transcript(){
 			curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); 
 			curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_NTLM); 
 			curl_setopt($ch,CURLOPT_POST,true);
-			curl_setopt($ch,CURLOPT_POSTFIELDS,$fields_string);
+			curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
 			curl_setopt($ch, CURLOPT_REFERER, 'http://student.guc.edu.eg/external/student/grade/Transcript.aspx');
 			curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8) Gecko/20051111 Firefox/1.5 BAVM/1.0.0');
 			curl_setopt($ch, CURLOPT_USERPWD, "$username:$pass");
@@ -702,17 +699,22 @@ function unlock_transcript(){
 			$contents = curl_exec($ch);
 			//echo curl_error($ch);
 			curl_close($ch);
+			require_once(WP_PLUGIN_DIR.'/gucTables/simple_html_dom.php');
+			$html = str_get_html($contents);
 			if(!(isset($_POST['stdYrLst']))){
 				if(!(strpos($contents, 'stdYrLst'))){
 					wp_die('There was an error unlocking the transcript. The admin system might be down or your username/password is/are incorrect');
 				}
-				require_once(WP_PLUGIN_DIR.'/gucTables/simple_html_dom.php');
-				$html = str_get_html($contents);
 				$form = $html->find('form[id=Form1]', 0);
 				$form->action = $_SERVER['REQUEST_URI'];
 				$form->innertext = $form->innertext .= "<input type='hidden' value='$username' name='username'><input type='hidden' value='$pass' name='password'>";
 				$drpdown = $html->find('select[id=stdYrLst]', 0);
 				$drpdown->disabled = null;
+				echo $html;
+				die();
+			}
+			else{
+				$html->find('table[id=Table2]', 0)->find('img', 0)->src = 'http://student.guc.edu.eg/Images/logo_bw.gif';
 				echo $html;
 				die();
 			}
