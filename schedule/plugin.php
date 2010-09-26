@@ -15,6 +15,8 @@ add_filter('the_content', 'guc_work');
 add_action('init', 'generate_schedule');
 add_action('init', 'unlock_transcript');
 add_action('admin_menu', 'guc_menu');
+add_action( 'admin_init', 'install_guc_schedule' );
+
 
 wp_register_script('guc-colorpicker', WP_PLUGIN_URL.'/gucTables/js/colorpicker.js');
 wp_register_style('guc-colorpicker', WP_PLUGIN_URL.'/gucTables/css/colorpicker.css');
@@ -24,17 +26,15 @@ wp_enqueue_script('guc-colorpicker');
 wp_enqueue_style('guc-colorpicker');
 
 function install_guc_schedule(){
-	register_setting('guc-schedule', 'enable');
-	update_option('enable', '0');
-	register_setting('guc-schedule', 'pdf');
-	update_option('pdf', '0');
+	register_setting('guc-schedule', 'schedule');
+	register_setting('guc-schedule', 'transcript');
 }
 
 function guc_work($content){
 	$test = explode('[guc-schedule]', $content);
 	if(count($test) != 1){
 		//Our page
-		if(get_option('enable') == '1')
+		if(get_option('schedule') == '1')
 		return "Under Construction";
 		$return =  <<<HTML
 		<h2>Instructions</h2>
@@ -214,6 +214,8 @@ HTML;
 	else{
 		$check = explode('[guc-transcript]', $content);
 		if(count($check) != 1){
+			if(get_option('transcript') == '1')
+			return "Under Construction";
 			$form = <<<HTML
 				<form action="" method="POST">
 				<b>Username</b><br>
@@ -224,7 +226,7 @@ HTML;
 				<input type="hidden" name="unlock_transcript_galal">
 				</form>		
 HTML;
-		return str_ireplace('[guc-transcript]', $form, $content);
+			return str_ireplace('[guc-transcript]', $form, $content);
 		}
 	}
 	return $content;
@@ -700,9 +702,7 @@ function unlock_transcript(){
 				$form = $html->find('form[id=Form1]', 0);
 				$form->action = $_SERVER['REQUEST_URI'];
 				$form->innertext = $form->innertext .= "<input type='hidden' value='$username' name='username'><input type='hidden' value='$pass' name='password'>";
-				$drpdown = $html->find('select[id=stdYrLst]', 0);
-				$drpdown->disabled = null;
-				echo $html;
+				echo str_replace('disabled="disabled"', '',$html);
 				die();
 			}
 			else{
@@ -710,33 +710,46 @@ function unlock_transcript(){
 				$generated = '';
 				$tables = $html->find('table[id=Table4]');
 				$tableCounter = 1;
+				$notFound = 0;
 				foreach($tables as $table){
 					$trs = $table->find('tr');
 					$semGPA = trim($table->find("span[id=ssnRptr__ctl". ($tableCounter-1) ."_ssnGpLbl]", 0)->plaintext);
 					$semTitle = trim($table->find('td', 0)->plaintext);
-					$generated .= "<center><h2>$semTitle - [$semGPA]</h2></center>";
-					$generated .= "<table id='table_$tableCounter' border = '1' align='center' style='font-family:Tahoma; border-collapse:collapse; font-size:10pt; width:auto; border-style:solid; border-color:black; border-width:2px;'>";
-					$generated .= '<tr>';
-					$generated .= '<td><strong>Subject</strong></td>';
-					$generated .= '<td><strong>Grade\'s Value</strong></td>';
-					$generated .= '<td><strong>Grade</strong></td>';
-					$generated .= '<td><strong>Hours</strong></td>';
-					$generated .= '</tr>';
-					foreach($trs as $tr){
-						$test = $tr->plaintext;
-						if((strpos($test, 'Grade') == false) && (strpos($test, 'GPA') == false)){
-							$hrs = trim($tr->find('td', 4)->plaintext);
-							$grade = trim($tr->find('td', 3)->plaintext);
-							$value = trim($tr->find('td', 2)->plaintext);
-							$subject = trim($tr->find('td', 1)->plaintext);
-							switch($grade){
+					$generated .= "<center><h2>$semTitle". (empty($semGPA)?'':" - [$semGPA]") ."</h2></center>";
+					if(count($trs) == 3){ 
+						$generated .= '<center>No grades found for the semester.</center>';
+						$notFound++; 
+						continue;
+					}
+					else{
+						$generated .= "<table id='table_$tableCounter' border = '1' align='center' style='font-family:Tahoma; border-collapse:collapse; font-size:10pt; width:auto; border-style:solid; border-color:black; border-width:2px;'>";
+						$generated .= '<tr>';
+						$generated .= '<td><strong>Subject</strong></td>';
+						$generated .= '<td><strong>Grade\'s Value</strong></td>';
+						$generated .= '<td><strong>Grade</strong></td>';
+						$generated .= '<td><strong>Hours</strong></td>';
+						$generated .= '</tr>';
+						$subjects = array();
+						foreach($trs as $tr){
+							$test = $tr->plaintext;
+							if((strpos($test, 'Grade') == false) && (strpos($test, 'GPA') == false) && (strpos($test, 'Winter') == false) && (strpos($test, 'Summer') == false) && (strpos($test, 'Spring') == false)){
+								$t = (object) 1;
+								$t->hrs = trim($tr->find('td', 4)->plaintext);
+								$t->grade = trim($tr->find('td', 3)->plaintext);
+								$t->value = trim($tr->find('td', 2)->plaintext);
+								$t->subject = trim($tr->find('td', 1)->plaintext);
+								array_push($subjects, $t);
+							}
+						}
+						usort($subjects, 'compareSubjects');
+						foreach($subjects as $subject){
+							switch($subject->grade){
 								case 'A+':
 									$gradeColor = '#1cba07';
 									$fontColor = 'white';
 									break;
 								case 'A':
 									$gradeColor = '#20d608';
-									
 									break;
 								case 'A-':
 									$gradeColor = '#1eff00';
@@ -774,6 +787,7 @@ function unlock_transcript(){
 								case 'FA':
 								case 'Ff':
 								case 'CM2':
+								case 'Abs':
 									$gradeColor = '#ff0000';
 									$fontColor = 'white';
 									break;
@@ -781,28 +795,34 @@ function unlock_transcript(){
 									$gradeColor = 'white';
 									$fontColor = 'black';
 							}
-							$generated .= "<tr bgcolor='$gradeColor' style='color:$fontColor'>";
-							$generated .= "<td width='50%'>$subject</td>";
-							$generated .= "<td width='15%'>$value</td>";
-							$generated .= "<td width='15%'>$grade</td>";
-							$generated .= "<td width='15%'>$hrs</td>";
+							$index = array_search($subject, $subjects) + 1;
+							$generated .= "<tr id='subject_$index' bgcolor='$gradeColor' style='color:$fontColor'>";
+							$generated .= "<td width='50%'>$subject->subject</td>";
+							$generated .= "<td width='15%'>$subject->value</td>";
+							$generated .= "<td width='15%'>$subject->grade</td>";
+							$generated .= "<td width='15%'>$subject->hrs</td>";
 							$generated .= '</tr>';
 						}
-					}
 					$generated .= '</table>';
 					$tableCounter++;
 				}
+			}//end of the tables loop
 				$name = trim($html->find('span[id=stdNmLbl]', 0)->plaintext);
 				$id = trim($html->find('span[id=appNoLbl]', 0)->plaintext);
 				$cat = trim($html->find('span[id=catLbl]', 0)->plaintext);
 				$cumGPA = trim($html->find('span[id=cmGpaLbl]', 0)->plaintext);
-				echo "<center><h2>[$id] $name's Transcript</h2></center>";
+				echo "<font face='serif'><center><h2>[$id] $name's Transcript</h2></center>";
 				echo '<center><img src="http://cairo.daad.de/imperia/md/images/logos/sonstige/guc_logo.png.jpg"></center>';
 				echo "<center><h3>Student's Category: [$cat]</h3></center>";
 				echo "<center><h3>Student's GPA: [$cumGPA]</h3></center>";
-				echo '<hr>'. $generated; 
-				echo '<br><br>';
-				echo '<center><small>Generated by Transcript Unlocker</small></center>';
+				if($notFound == 3){
+					echo '<hr><center><strong>Couldn\'t find grades for you in the selected year. Please go <a href="javascript:history.go(-1);">back</a> and select another one.</strong></center><br><br>'; 	
+				}
+				else{
+					echo '<hr>'. $generated; 
+					echo '<br><br>';
+				}
+				echo '<center><small>Generated by Transcript Unlocker</small></center></font>';
 				die();
 			}
 			echo $contents;
@@ -810,20 +830,26 @@ function unlock_transcript(){
 	}
 }
 
-
+function compareSubjects($a, $b){
+	$grades = array('A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'FA', 'Ff', 'CM2', 'Abs');
+	$a = array_search($a->grade, $grades) or 99;
+	$b = array_search($b->grade, $grades) or 99;
+	if(  $a ==  $b ){ return 0 ; } 
+  	return ($a < $b) ? -1 : 1;	
+}
 
 function guc_options(){
 	?>
 	<div class="wrap g-project-style">
-		<h2>Schedule Beautifier</h2>
+		<h2>GUC</h2>
 		<form method="post" action="options.php">
 		   <?php  settings_fields( 'guc-schedule' ); ?>
-		    <h3>Deactivate</h3>
+		    <h3>Deactivate Schedule</h3>
 		       <label>Deactivate the beautifier? - 1 yes, 0 no.</label>
-		       <input type="text" name="enable" value="<?php echo get_option('enable'); ?>" />
-	      	<h3>PDF</h3>
-	       		<label>Schedules as PDFs? - 1 yes, 0 no.</label>
-	       		<input type="text" name="pdf" value="<?php echo get_option('pdf'); ?>" />
+		       <input type="text" name="schedule" value="<?php echo get_option('schedule'); ?>" />
+	      	<h3>Deactivate Transcript</h3>
+	       		<label>Deactivate Transcript? - 1 yes, 0 no.</label>
+	       		<input type="text" name="transcript" value="<?php echo get_option('transcript'); ?>" />
 	       		<br><br>
 	       		<input type="submit" class="button-primary" value="Save Options" />
 		</form>
@@ -832,7 +858,7 @@ function guc_options(){
 }
 
 function guc_menu(){
-	add_menu_page( "GUC Schedules", "GUC Schedule", "manage_options", "guc_beautifier", "guc_options");
-	add_submenu_page( 'guc_beautifier', 'Schedule Options', 'Options', 'manage_options', 'guc_beautifier', 'guc_options');
+	add_menu_page( "GUC", "GUC", "manage_options", "guc_beautifier", "guc_options");
+	add_submenu_page( 'guc_beautifier', 'Options', 'Options', 'manage_options', 'guc_beautifier', 'guc_options');
 }
 ?>
